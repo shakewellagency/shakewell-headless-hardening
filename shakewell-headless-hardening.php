@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       Shakewell Headless Hardening
  * Plugin URI:        https://github.com/shakewellagency/shakewell-headless-hardening
- * Description:       Switchable hardening modules for headless sites: locks down REST, ACF secrets, XML-RPC and the legacy Gravity Forms API.
- * Version:           0.1.0
+ * Description:       Switchable hardening modules for headless sites: locks down REST, ACF secrets, XML-RPC, the legacy Gravity Forms API, staff addresses in form definitions and indexing of chosen hostnames.
+ * Version:           0.2.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Shakewell
@@ -19,10 +19,10 @@ namespace Shakewell\HeadlessHardening;
 
 defined( 'ABSPATH' ) || exit;
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
 const FILE    = __FILE__;
 
-foreach ( array( 'Guard', 'AcfLockdown', 'RestBoundaries', 'XmlRpcOff', 'GravityFormsApiV1Off', 'Plugin' ) as $shakewell_headless_hardening_class ) {
+foreach ( array( 'Guard', 'AcfLockdown', 'RestBoundaries', 'XmlRpcOff', 'GravityFormsApiV1Off', 'GravityFormsAddresses', 'NoindexHosts', 'Plugin' ) as $shakewell_headless_hardening_class ) {
 	require_once __DIR__ . '/src/' . $shakewell_headless_hardening_class . '.php';
 }
 
