@@ -26,3 +26,14 @@ tests_add_filter(
 require $tests_dir . '/includes/bootstrap.php';
 
 require __DIR__ . '/BaseCase.php';
+
+if ( ! function_exists( 'get_field' ) ) {
+	/**
+	 * Stand-in for ACF's get_field(), so the allow-listed field callback has something to read.
+	 *
+	 * @param string $name Field name.
+	 */
+	function get_field( $name ) { // phpcs:ignore Universal.NamingConventions.NoReservedKeywordParameterNames
+		return 'value-' . $name;
+	}
+}

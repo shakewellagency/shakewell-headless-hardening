@@ -98,7 +98,39 @@ final class AcfLockdownTest extends BaseCase {
 		$page = self::factory()->post->create( array( 'post_type' => 'page' ) );
 		AcfLockdown::register_public_fields();
 		$field = $GLOBALS['wp_rest_additional_fields']['page']['acf']['get_callback'];
-		$this->assertSame( array( 'is_private' => null ), $field( array( 'id' => $page ) ), 'secret-shaped names are never registered' );
+		$this->assertSame( array( 'is_private' => 'value-is_private' ), $field( array( 'id' => $page ) ), 'secret-shaped names are never registered' );
+
+		$locked = self::factory()->post->create(
+			array(
+				'post_type'     => 'page',
+				'post_password' => 'pw',
+			)
+		);
+		$this->assertSame( array( 'is_private' => null ), $field( array( 'id' => $locked ) ), 'a password-protected post gives nothing' );
+	}
+
+	public function test_secrets_inside_objects_are_blanked(): void {
+		$data = AcfLockdown::redact( array( 'group' => (object) array( 'api_key' => 'hunter2', 'label' => 'kept', 'inner' => (object) array( 'client_secret' => 'hunter2' ) ) ) );
+		$this->assertStringNotContainsString( 'hunter2', wp_json_encode( $data ) );
+		$this->assertSame( 'kept', $data['group']['label'] );
+	}
+
+	public function test_common_credential_names_are_matched(): void {
+		foreach ( array( 'auth_token', 'refresh_token', 'bearer_token', 'passwd', 'credentials', 'Stripe-Secret' ) as $name ) {
+			$this->assertTrue( AcfLockdown::is_secret( $name ), $name );
+		}
+		$this->assertFalse( AcfLockdown::is_secret( 'title' ) );
+	}
+
+	public function test_the_unredacted_capability_is_configurable(): void {
+		add_filter(
+			'shakewell_headless_hardening_unredacted_capability',
+			static function () {
+				return 'manage_options';
+			}
+		);
+		$this->assertSame( '', $this->get( '/wp/v2/leaky', 'editor' )->get_data()['acf']['api_key'] );
+		$this->assertSame( 'secret-1', $this->get( '/wp/v2/leaky', 'administrator' )->get_data()['acf']['api_key'] );
 	}
 
 	public function test_nothing_is_registered_without_configuration(): void {

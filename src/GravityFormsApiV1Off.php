@@ -46,6 +46,11 @@ final class GravityFormsApiV1Off {
 		// Read-only: the value is only matched against a fixed pattern, never stored or output.
 		$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$path = rawurldecode( (string) wp_parse_url( $uri, PHP_URL_PATH ) );
+		// A site installed in a subdirectory sees the install path in the request URI.
+		$home = untrailingslashit( (string) wp_parse_url( home_url(), PHP_URL_PATH ) );
+		if ( '' !== $home && 0 === stripos( $path, $home . '/' ) ) {
+			$path = substr( $path, strlen( $home ) );
+		}
 		if ( self::is_legacy_path( $path ) ) {
 			wp_send_json(
 				array(

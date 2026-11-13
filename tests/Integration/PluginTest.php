@@ -113,6 +113,22 @@ final class PluginTest extends WP_UnitTestCase {
 		}
 		$this->assertSame( '{"status":404,"response":"Not found"}', $body );
 
+		// A subdirectory install sees its path in the request URI.
+		add_filter(
+			'home_url',
+			static function () {
+				return 'https://example.test/blog';
+			}
+		);
+		$_SERVER['REQUEST_URI'] = '/blog/gravityformsapi/forms';
+		ob_start();
+		try {
+			do_action( 'parse_request', new \WP() );
+			$this->fail( 'the subdirectory request should have been ended' );
+		} catch ( \RuntimeException $e ) {
+			$this->assertStringContainsString( '404', ob_get_clean() );
+		}
+
 		$_SERVER['REQUEST_URI'] = '/about/';
 		do_action( 'parse_request', new \WP() );
 		$this->assertTrue( true );

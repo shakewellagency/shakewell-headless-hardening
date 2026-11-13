@@ -14,7 +14,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * - /wp/vN/users and /wp/vN/coauthors, and any other base listed in the filter, answer staff only.
  *   The default users route hands out slugs, which on many sites derive from email addresses.
- * - Author archives answer 404 to non-staff and oEmbed drops author_url and author_name, because
+ * - Author archives answer 404 to non-staff, the core users sitemap is dropped and oEmbed drops author_url and author_name, because
  *   they confirm the same slugs by another route. Gating one path and leaving the others would
  *   move the exposure, not remove it.
  * - Namespaces listed in the filter answer staff only, including routes added later by someone who
@@ -33,6 +33,7 @@ final class RestBoundaries {
 	public static function boot(): void {
 		Guard::refuse_non_staff( array( self::class, 'is_guarded' ) );
 		add_action( 'template_redirect', array( self::class, 'hide_author_archive' ), 1 );
+		add_filter( 'wp_sitemaps_add_provider', array( self::class, 'drop_users_sitemap' ), 10, 2 );
 		add_filter( 'oembed_response_data', array( self::class, 'strip_oembed_author' ), PHP_INT_MAX - 1 );
 	}
 
@@ -75,6 +76,17 @@ final class RestBoundaries {
 			status_header( 404 );
 			nocache_headers();
 		}
+	}
+
+	/**
+	 * Drops the core users sitemap, which lists every author archive URL.
+	 *
+	 * @param mixed  $provider Sitemap provider.
+	 * @param string $name     Provider name.
+	 * @return mixed
+	 */
+	public static function drop_users_sitemap( $provider, $name ) {
+		return 'users' === $name ? false : $provider;
 	}
 
 	/**

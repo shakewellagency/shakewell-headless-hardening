@@ -17,7 +17,7 @@ defined( 'ABSPATH' ) || exit;
  * 1. The acf/* REST namespace is refused to anyone who is not staff. Plugins that expose ACF
  *    options over REST have shipped without a permission callback, which put whole options
  *    records, API keys included, within reach of an anonymous caller.
- * 2. Credential-shaped fields are blanked in anonymous wp/v2 and acf/* responses. The key stays
+ * 2. Credential-shaped fields (including inside objects) are blanked in anonymous wp/v2 and acf/* responses. The key stays
  *    and its value becomes an empty string, so a consumer that indexes it gets no PHP notice.
  *    A nested array deeper than the walk limit is emptied, never passed through.
  * 3. Optionally, a named list of ACF fields is the only ACF data on core responses.
@@ -29,11 +29,12 @@ defined( 'ABSPATH' ) || exit;
  *   registered. Both empty by default, so nothing is exposed.
  * - shakewell_headless_hardening_redact_route_prefixes: routes whose responses are redacted.
  *   Defaults to /wp/v2 and /acf.
+ * - shakewell_headless_hardening_unredacted_capability: who sees fields unredacted. Default edit_pages.
  * - shakewell_headless_hardening_public_routes: routes no guard applies to.
  */
 final class AcfLockdown {
 
-	private const PATTERN   = '/(passcode|password|secret|api[_-]?key|api[_-]?token|access[_-]?token|private[_-]?key|client[_-]?secret)/i';
+	private const PATTERN   = '/(passcode|password|passwd|secret|api[_-]?key|api[_-]?token|access[_-]?token|auth[_-]?token|refresh[_-]?token|bearer[_-]?token|private[_-]?key|client[_-]?secret|credentials?)/i';
 	private const MAX_DEPTH = 12;
 
 	/**
@@ -77,6 +78,10 @@ final class AcfLockdown {
 	 * @return mixed
 	 */
 	public static function redact( $value, int $depth = 0 ) {
+		if ( is_object( $value ) ) {
+			// Objects (stdClass, JsonSerializable) are walked as the arrays they serialise to.
+			$value = json_decode( (string) wp_json_encode( $value ), true );
+		}
 		if ( ! is_array( $value ) ) {
 			return $value;
 		}
@@ -86,7 +91,7 @@ final class AcfLockdown {
 		foreach ( $value as $key => $item ) {
 			if ( self::is_secret( $key ) ) {
 				$value[ $key ] = '';
-			} elseif ( is_array( $item ) ) {
+			} elseif ( is_array( $item ) || is_object( $item ) ) {
 				$value[ $key ] = self::redact( $item, $depth + 1 );
 			}
 		}
@@ -102,7 +107,15 @@ final class AcfLockdown {
 	 * @return mixed
 	 */
 	public static function redact_response( $response, $server, $request ) {
-		if ( current_user_can( 'edit_pages' ) || ! $response instanceof WP_REST_Response ) {
+		/**
+		 * Filters the capability that sees ACF fields unredacted. Route access uses
+		 * shakewell_headless_hardening_staff_capability instead, so by default an author or
+		 * contributor can open acf routes but still gets redacted data.
+		 *
+		 * @param string $capability Defaults to edit_pages.
+		 */
+		$unredacted = (string) apply_filters( 'shakewell_headless_hardening_unredacted_capability', 'edit_pages' );
+		if ( current_user_can( $unredacted ) || ! $response instanceof WP_REST_Response ) {
 			return $response;
 		}
 		$route = Guard::route( $request );
@@ -159,6 +172,10 @@ final class AcfLockdown {
 			'acf',
 			array(
 				'get_callback' => static function ( $item ) use ( $fields ) {
+					// Core blanks content for a password-protected post; extra fields must not leak either.
+					if ( post_password_required( $item['id'] ) ) {
+						return array_fill_keys( $fields, null );
+					}
 					$out = array();
 					foreach ( $fields as $name ) {
 						$out[ $name ] = function_exists( 'get_field' ) ? get_field( $name, $item['id'] ) : null;

@@ -104,6 +104,12 @@ final class RestBoundariesTest extends BaseCase {
 		$this->assertFalse( is_404() );
 	}
 
+	public function test_the_users_sitemap_provider_is_dropped(): void {
+		$this->assertFalse( RestBoundaries::drop_users_sitemap( new \stdClass(), 'users' ) );
+		$this->assertInstanceOf( \stdClass::class, RestBoundaries::drop_users_sitemap( new \stdClass(), 'posts' ) );
+		$this->assertNotFalse( has_filter( 'wp_sitemaps_add_provider', array( RestBoundaries::class, 'drop_users_sitemap' ) ) );
+	}
+
 	public function test_oembed_loses_the_author_link_and_name(): void {
 		$data = RestBoundaries::strip_oembed_author(
 			array(

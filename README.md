@@ -8,8 +8,8 @@ Switchable hardening modules for WordPress sites that sit behind a separate fron
 
 | Module | Key | Default | What it does |
 |---|---|---|---|
-| ACF lockdown | `acf_lockdown` | on | Refuses the `acf/*` REST namespace to anyone who is not staff. Blanks credential-shaped ACF fields (password, secret, API key, access token, private key and so on) in anonymous `wp/v2` and `acf/*` responses. Optionally exposes a short list of ACF fields you name on chosen post types, and nothing else from ACF. |
-| REST boundaries | `rest_boundaries` | on | Refuses `/wp/vN/users` and `/wp/vN/coauthors` to non-staff, and any namespace you list. Also answers 404 on author archives and removes `author_url` and `author_name` from oEmbed, because they confirm the same user slugs by another route. |
+| ACF lockdown | `acf_lockdown` | on | Refuses the `acf/*` REST namespace to anyone who is not staff. Blanks credential-shaped ACF fields, including inside objects (password, secret, API key, auth or access token, private key, credentials and so on) in anonymous `wp/v2` and `acf/*` responses. Optionally exposes a short list of ACF fields you name on chosen post types (nothing for a password-protected post), and nothing else from ACF. |
+| REST boundaries | `rest_boundaries` | on | Refuses `/wp/vN/users` and `/wp/vN/coauthors` to non-staff, and any namespace you list. Also answers 404 on author archives and drops the core users sitemap and removes `author_url` and `author_name` from oEmbed, because they confirm the same user slugs by another route. |
 | XML-RPC off | `xmlrpc_off` | on | Ends any XML-RPC request with a 403 before WordPress builds the server, and empties the method list as a second layer. |
 | Gravity Forms API v1 off | `gravity_forms_api_v1_off` | off | Turns off the legacy `/gravityformsapi/` API with the filter Gravity Forms provides, leaves REST API v2 running, and answers the old path with a plain 404. |
 
@@ -37,6 +37,7 @@ Nothing site-specific is built in. Every list below is empty unless stated.
 | `shakewell_headless_hardening_guarded_namespaces` | Route prefixes that answer staff only, for example `/example/v1/admin`. | REST boundaries |
 | `shakewell_headless_hardening_guarded_wp_bases` | Bases under `/wp/vN` that answer staff only. Default `users`, `coauthors`. | REST boundaries |
 | `shakewell_headless_hardening_secret_fields` | Extra exact field names to withhold, on top of the built-in pattern. | ACF lockdown |
+| `shakewell_headless_hardening_unredacted_capability` | Capability that sees ACF fields unredacted. Default `edit_pages`, so an author can open `acf` routes (see `staff_capability`) but still gets redacted data. | ACF lockdown |
 | `shakewell_headless_hardening_redact_route_prefixes` | Routes whose responses are redacted for non-editors. Default `/wp/v2`, `/acf`. | ACF lockdown |
 | `shakewell_headless_hardening_acf_rest_post_types` | Post types that get an `acf` object holding only the fields below. | ACF lockdown |
 | `shakewell_headless_hardening_acf_rest_fields` | ACF field names that object exposes. A secret-shaped name is never exposed. | ACF lockdown |
