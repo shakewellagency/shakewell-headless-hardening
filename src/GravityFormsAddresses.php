@@ -36,9 +36,13 @@ defined( 'ABSPATH' ) || exit;
 final class GravityFormsAddresses {
 
 	/**
-	 * Registers the response filter, last in the chain.
+	 * Registers the response filters, last in their chains.
+	 *
+	 * The filter rest_request_after_callbacks runs for every dispatch, including internal ones through
+	 * rest_do_request(). The filter rest_post_dispatch is a second layer for requests served over HTTP.
 	 */
 	public static function boot(): void {
+		add_filter( 'rest_request_after_callbacks', array( self::class, 'strip_response' ), PHP_INT_MAX - 1, 3 );
 		add_filter( 'rest_post_dispatch', array( self::class, 'strip_response' ), PHP_INT_MAX - 1, 3 );
 	}
 
@@ -55,15 +59,20 @@ final class GravityFormsAddresses {
 	 * Removes notifications from the response of a form-definition route.
 	 *
 	 * @param mixed $response Response.
-	 * @param mixed $server   REST server.
+	 * @param mixed $server   REST server, or the matched handler when called from rest_request_after_callbacks.
 	 * @param mixed $request  Request.
 	 * @return mixed
 	 */
 	public static function strip_response( $response, $server, $request ) {
-		if ( $response instanceof WP_HTTP_Response && self::is_definition_route( Guard::route( $request ) ) ) {
-			$response->set_data( self::strip( $response->get_data() ) );
+		if ( ! self::is_definition_route( Guard::route( $request ) ) ) {
+			return $response;
 		}
-		return $response;
+		if ( $response instanceof WP_HTTP_Response ) {
+			$response->set_data( self::strip( $response->get_data() ) );
+			return $response;
+		}
+		// rest_request_after_callbacks hands over whatever the route callback returned, often a plain array.
+		return $response instanceof \WP_Error ? $response : self::strip( $response );
 	}
 
 	/**

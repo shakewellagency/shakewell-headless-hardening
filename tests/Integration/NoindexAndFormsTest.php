@@ -16,14 +16,24 @@ use WP_UnitTestCase;
 
 final class NoindexAndFormsTest extends WP_UnitTestCase {
 
+	private $original_host;
+
 	public function set_up(): void {
 		parent::set_up();
+		$this->original_host = $_SERVER['HTTP_HOST'] ?? null;
+		putenv( 'SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST' );
 		NoindexHosts::boot();
 		GravityFormsAddresses::boot();
 	}
 
 	public function tear_down(): void {
-		unset( $_SERVER['HTTP_HOST'] );
+		putenv( 'SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST' );
+		if ( null === $this->original_host ) {
+			unset( $_SERVER['HTTP_HOST'] );
+		} else {
+			$_SERVER['HTTP_HOST'] = $this->original_host;
+		}
+		set_current_screen( 'front' );
 		parent::tear_down();
 	}
 
@@ -114,5 +124,49 @@ final class NoindexAndFormsTest extends WP_UnitTestCase {
 		$data = array( 'notifications' => array( 'keep' ) );
 		$this->assertSame( $data, $this->dispatch( '/gf/v2/forms/3/entries', $data ) );
 		$this->assertSame( $data, $this->dispatch( '/wp/v2/posts', $data ) );
+	}
+
+	public function test_hosts_come_from_the_environment_list(): void {
+		putenv( 'SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST= Check.Example.test , ,*.preview.test' );
+		$this->assertSame( array( 'check.example.test', '*.preview.test' ), NoindexHosts::hosts() );
+	}
+
+	public function test_rest_responses_on_a_listed_host_carry_the_header(): void {
+		$this->hosts( array( 'check.example.test' ) );
+		$_SERVER['HTTP_HOST'] = 'check.example.test';
+		$response             = apply_filters( 'rest_post_dispatch', new WP_REST_Response( array() ), rest_get_server(), new WP_REST_Request( 'GET', '/wp/v2/posts' ) );
+		$this->assertSame( 'noindex, nofollow', $response->get_headers()['X-Robots-Tag'] );
+
+		$_SERVER['HTTP_HOST'] = 'www.example.test';
+		$response             = apply_filters( 'rest_post_dispatch', new WP_REST_Response( array() ), rest_get_server(), new WP_REST_Request( 'GET', '/wp/v2/posts' ) );
+		$this->assertArrayNotHasKey( 'X-Robots-Tag', $response->get_headers() );
+	}
+
+	public function test_the_admin_keeps_its_real_blog_public_value(): void {
+		$this->hosts( array( 'check.example.test' ) );
+		$_SERVER['HTTP_HOST'] = 'check.example.test';
+		set_current_screen( 'options-reading' );
+		$this->assertSame( 1, (int) get_option( 'blog_public' ) );
+	}
+
+	public function test_an_internal_dispatch_is_stripped_too(): void {
+		add_action(
+			'rest_api_init',
+			static function () {
+				register_rest_route(
+					'gf/v2',
+					'/forms/(?P<id>\d+)',
+					array(
+						'methods'             => 'GET',
+						'callback'            => static fn() => array( 'id' => 5, 'title' => 'T', 'notifications' => array( 'to' => 'staff@example.test' ) ),
+						'permission_callback' => '__return_true',
+					)
+				);
+			}
+		);
+		$GLOBALS['wp_rest_server'] = null;
+		$data                      = rest_do_request( new WP_REST_Request( 'GET', '/gf/v2/forms/5' ) )->get_data();
+		$this->assertSame( 'T', $data['title'] );
+		$this->assertArrayNotHasKey( 'notifications', $data );
 	}
 }

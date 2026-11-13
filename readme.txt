@@ -19,7 +19,7 @@ A site with a separate front end keeps WordPress open on its own hostname. This 
 * **XML-RPC off** (on by default): ends every XML-RPC request.
 * **Gravity Forms API v1 off** (off by default): turns off the legacy Gravity Forms Web API and leaves REST API v2 running. Needs Gravity Forms, which is a separate product.
 * **Gravity Forms addresses** (off by default): removes notification settings, and the staff addresses in them, from Gravity Forms REST v2 form definitions.
-* **No index on chosen hosts** (does nothing until you list hostnames): sends noindex, a robots meta tag and a disallow-all robots.txt on the hostnames you list in SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST (comma-separated) or the shakewell_headless_hardening_noindex_hosts filter, and leaves every other hostname alone.
+* **No index on chosen hosts** (does nothing until you list hostnames): sends noindex on pages and REST responses, a robots meta tag and a disallow-all robots.txt on the hostnames you list in SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST (comma-separated) or the shakewell_headless_hardening_noindex_hosts filter, and leaves every other hostname alone.
 
 Switch a module with the constant SHAKEWELL_HEADLESS_HARDENING_ followed by the module key in capitals, for example SHAKEWELL_HEADLESS_HARDENING_XMLRPC_OFF, or with the filter shakewell_headless_hardening_module_enabled. The route and field lists are filters, all empty by default. See the readme in the repository for the full list.
 

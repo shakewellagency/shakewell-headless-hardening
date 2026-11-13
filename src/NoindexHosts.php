@@ -19,8 +19,10 @@ defined( 'ABSPATH' ) || exit;
  * (comma-separated) and the filter shakewell_headless_hardening_noindex_hosts. An entry is an exact
  * hostname, or *.example.test for every subdomain of example.test. With no hostnames the module does nothing.
  *
- * On a matching host it sends the X-Robots-Tag header (so REST responses and assets are covered), the
- * robots meta tag, a disallow-all robots.txt, and reports blog_public as 0.
+ * On a matching host it sends the X-Robots-Tag header on pages and on REST responses, adds the robots
+ * meta tag, answers robots.txt with disallow-all, and reports blog_public as 0 on the front end. It
+ * cannot reach files the web server serves without starting WordPress (images, scripts, downloads):
+ * add a web-server rule for those if they matter.
  */
 final class NoindexHosts {
 
@@ -31,6 +33,8 @@ final class NoindexHosts {
 	 */
 	public static function boot(): void {
 		add_filter( 'wp_headers', array( self::class, 'add_header' ) );
+		// REST requests exit before WP::send_headers(), so wp_headers never runs for them.
+		add_filter( 'rest_post_dispatch', array( self::class, 'add_rest_header' ) );
 		add_action( 'wp_head', array( self::class, 'print_meta' ), 1 );
 		add_filter( 'robots_txt', array( self::class, 'robots_txt' ), PHP_INT_MAX );
 		add_filter( 'pre_option_blog_public', array( self::class, 'blog_public' ) );
@@ -98,6 +102,19 @@ final class NoindexHosts {
 	}
 
 	/**
+	 * Adds the X-Robots-Tag header to a REST response.
+	 *
+	 * @param mixed $response REST response.
+	 * @return mixed
+	 */
+	public static function add_rest_header( $response ) {
+		if ( $response instanceof \WP_HTTP_Response && self::is_listed_host() ) {
+			$response->header( 'X-Robots-Tag', 'noindex, nofollow' );
+		}
+		return $response;
+	}
+
+	/**
 	 * Prints the robots meta tag.
 	 */
 	public static function print_meta(): void {
@@ -119,10 +136,13 @@ final class NoindexHosts {
 	/**
 	 * Reports the site as not public, which drives WordPress's own indexing signals.
 	 *
+	 * Not in the admin: on a listed host the Reading settings screen would show "Discourage search
+	 * engines" as ticked, and saving it would write blog_public = 0 for every hostname.
+	 *
 	 * @param mixed $pre Short-circuit value; false means no short-circuit.
 	 * @return mixed
 	 */
 	public static function blog_public( $pre ) {
-		return self::is_listed_host() ? 0 : $pre;
+		return ! is_admin() && self::is_listed_host() ? 0 : $pre;
 	}
 }
