@@ -24,3 +24,5 @@ tests_add_filter(
 );
 
 require $tests_dir . '/includes/bootstrap.php';
+
+require __DIR__ . '/BaseCase.php';
