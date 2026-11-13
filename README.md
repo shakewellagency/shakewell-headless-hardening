@@ -1,89 +1,78 @@
-# Shakewell plugin template
+# Shakewell Headless Hardening
 
 > **Made by [Shakewell](https://shakewell.agency).** Free and open source, built and maintained by the Shakewell team.
 
-The starting point for every Shakewell WordPress plugin. Each plugin built from it is free and open source (GPL-2.0-or-later), Shakewell-owned and maintained, and written so it can be listed in the WordPress plugin directory.
+Switchable hardening modules for WordPress sites that sit behind a separate front end. A headless site keeps WordPress reachable on its own hostname, so the REST API, the ACF options record, XML-RPC and the legacy Gravity Forms API are all open to the internet. Each module closes one of those, and each can be switched on its own.
 
-## Rules every plugin follows
+## Modules
 
-- **Small and single-purpose.** Build only what the sites need. Fewer lines means less to attack and less to break.
-- **Generic.** Anything site-specific is a setting, a constant or a filter, never a value in code. The plugin must install from its release zip on a plain WordPress site and do something sensible, or explain in an admin notice or the readme what it needs, before anything is configured.
-- **No client content anywhere.** No client, staff or host names, ids, buckets or account numbers in code, comments, tests, fixtures, readmes, changelogs, commit messages, tags or the repository description. Use neutral examples (`book`, `author`, `example.test`). Anything one client needs to switch the plugin on belongs in that client's own documentation, not here.
-- **No paid dependencies** where it can be avoided. Core WordPress storage first. A plugin that extends ACF or Gravity Forms says so in its readme.
-- **Directory rules from day one** ([guidelines](https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/)): GPL, no tracking or calls home, no locked features, every outside service named in the readme, translatable strings.
-- **Security basics on every action:** capability check, nonce check, sanitise input, escape output (late, at the point of output), prepared SQL, no secrets in options or logs, and `defined( 'ABSPATH' ) || exit;` at the top of every PHP file that ships (`uninstall.php` checks `WP_UNINSTALL_PLUGIN` instead).
-- **Prefix everything.** Functions, classes, constants, options, transients, hooks, query vars, script and style handles and CSS ids start with `shakewell_<name>` or sit in the `Shakewell\<Name>` namespace. Enqueue scripts and styles with `wp_enqueue_*`; no inline `<script>` or `<style>` blocks. Use the libraries WordPress bundles instead of shipping copies.
-- **Nothing remote.** No telemetry, no calls home, no CDN-hosted assets, no downloading or running code, no own updater. A call to an outside service is off until an admin opts in, and the readme lists it under "External services" with what is sent, when, and links to the service's terms and privacy policy.
-- **No nagging.** No upsells, forced credits or links, or admin takeover. A notice is dismissible and appears only where the plugin needs attention.
-- **readme.txt:** `Contributors: shakewellagency` (the WordPress.org account), at most 5 tags, a short description of at most 150 characters that says what the plugin does, no keyword stuffing, `Tested up to` set to the current WordPress major (check https://api.wordpress.org/core/version-check/1.7/), `Stable tag` equal to the header version, and a changelog entry for every release.
-- **Dependencies.** When the plugin needs another plugin that is on WordPress.org, declare it with a `Requires Plugins:` header in `shakewell-<name>.php`, next to `Requires at least` and `Requires PHP`.
-- **Trademarks.** Another product's name appears only as "for X" at the end of the plugin name, never at the start.
-- **Licence.** Everything in the zip, including bundled libraries and assets, is GPL-2.0-or-later compatible. Keep any copyright or authorship notice a file already carries. Minified files ship with their readable source.
-- **Naming:** repository, folder, main file, slug and text domain are all `shakewell-<name>`. PHP namespace `Shakewell\<Name>`, global prefix `shakewell_<name>_`. Never start a name with someone else's trademark ("Shakewell Mailer for Amazon SES", not "Amazon SES Mailer"), and never use the words "plugin", "WordPress" or "WP" in a name: the directory refuses them. The template's own name breaks this on purpose; it is never listed.
+| Module | Key | Default | What it does |
+|---|---|---|---|
+| ACF lockdown | `acf_lockdown` | on | Refuses the `acf/*` REST namespace to anyone who is not staff. Blanks credential-shaped ACF fields, including inside objects (password, secret, API key, auth or access token, private key, credentials and so on) in anonymous `wp/v2` and `acf/*` responses. Optionally exposes a short list of ACF fields you name on chosen post types (nothing for a password-protected post), and nothing else from ACF. |
+| REST boundaries | `rest_boundaries` | on | Refuses `/wp/vN/users` and `/wp/vN/coauthors` to non-staff, and any namespace you list. Also answers 404 on author archives and drops the core users sitemap and removes `author_url` and `author_name` from oEmbed, because they confirm the same user slugs by another route. |
+| XML-RPC off | `xmlrpc_off` | on | Ends any XML-RPC request with a 403 before WordPress builds the server, and empties the method list as a second layer. |
+| Gravity Forms API v1 off | `gravity_forms_api_v1_off` | off | Turns off the legacy `/gravityformsapi/` API with the filter Gravity Forms provides, leaves REST API v2 running, and answers the old path with a plain 404. |
 
-## Make a new plugin
+Every guard that refuses a request runs last in the filter chain and again just before the route callback, so a third-party callback that returns nothing cannot reopen a route. Guards fail closed: a secret nested too deep to inspect is emptied, not passed through.
 
-1. On GitHub: **Use this template** → `shakewellagency/shakewell-<name>`, public from the start.
-2. Rename, all in one go: `shakewell-plugin-template` → `shakewell-<name>`, `Shakewell\PluginTemplate` → `Shakewell\<Name>`, `shakewell_plugin_template` → `shakewell_<name>`, `Shakewell Plugin Template` → the plugin's name. Rename the main file to `shakewell-<name>.php`.
-3. Write `readme.txt` (description, external services, changelog), keeping `Contributors: shakewellagency`, and turn on private vulnerability reporting (Settings → Code security). Set the repository description and topics to say what the plugin does, with no client names.
+## Switch a module
+
+In `wp-config.php`, set `SHAKEWELL_HEADLESS_HARDENING_<KEY>` to `true` or `false`, for example:
+
+```php
+define( 'SHAKEWELL_HEADLESS_HARDENING_XMLRPC_OFF', false );
+define( 'SHAKEWELL_HEADLESS_HARDENING_GRAVITY_FORMS_API_V1_OFF', true );
+```
+
+Or use the filter `shakewell_headless_hardening_module_enabled( $enabled, $module )`. The constant wins over the default, and the filter wins over both.
+
+## Configure with filters
+
+Nothing site-specific is built in. Every list below is empty unless stated.
+
+| Filter | Value | Used by |
+|---|---|---|
+| `shakewell_headless_hardening_public_routes` | Route prefixes no guard applies to, for example `/example/v1/public`. | ACF lockdown, REST boundaries |
+| `shakewell_headless_hardening_staff_capability` | Capability that opens a guarded route. Default `edit_posts`. | ACF lockdown, REST boundaries |
+| `shakewell_headless_hardening_guarded_namespaces` | Route prefixes that answer staff only, for example `/example/v1/admin`. | REST boundaries |
+| `shakewell_headless_hardening_guarded_wp_bases` | Bases under `/wp/vN` that answer staff only. Default `users`, `coauthors`. | REST boundaries |
+| `shakewell_headless_hardening_secret_fields` | Extra exact field names to withhold, on top of the built-in pattern. | ACF lockdown |
+| `shakewell_headless_hardening_unredacted_capability` | Capability that sees ACF fields unredacted. Default `edit_pages`, so an author can open `acf` routes (see `staff_capability`) but still gets redacted data. | ACF lockdown |
+| `shakewell_headless_hardening_redact_route_prefixes` | Routes whose responses are redacted for non-editors. Default `/wp/v2`, `/acf`. | ACF lockdown |
+| `shakewell_headless_hardening_acf_rest_post_types` | Post types that get an `acf` object holding only the fields below. | ACF lockdown |
+| `shakewell_headless_hardening_acf_rest_fields` | ACF field names that object exposes. A secret-shaped name is never exposed. | ACF lockdown |
+
+Example, in a small plugin or `functions.php`:
+
+```php
+add_filter( 'shakewell_headless_hardening_guarded_namespaces', fn() => array( '/example/v1/admin' ) );
+add_filter( 'shakewell_headless_hardening_acf_rest_post_types', fn() => array( 'page' ) );
+add_filter( 'shakewell_headless_hardening_acf_rest_fields', fn() => array( 'is_private' ) );
+```
+
+## What it does not do
+
+It does not replace a web application firewall, and it does not block `xmlrpc.php` at the web server: do that too, because the web server rule is the cheap gate and this module is what still holds if the rule is lost. It only reads requests and responses; it stores nothing, calls no outside service and adds no admin screen.
+
+## Install
+
+Download `shakewell-headless-hardening.zip` from the [latest release](https://github.com/shakewellagency/shakewell-headless-hardening/releases/latest), or pin it with Composer as described in the [Shakewell plugin template](https://github.com/shakewellagency/shakewell-plugin-template). Requires WordPress 6.5 and PHP 8.1.
 
 ## Work on it
 
 ```sh
 composer install
 npm ci
-npm run env:start      # WordPress at http://localhost:8888 (admin / password), needs Docker
+npm run env:start      # needs Docker
 npm test               # PHPUnit inside the WordPress test container
 composer lint          # WordPress coding standards
-npm run plugin-check   # the official Plugin Check, as the directory runs it
+npm run plugin-check   # the official Plugin Check
 ```
-
-CI runs the same on every pull request, on the lowest supported WordPress and PHP and on the latest.
-
-## Release
-
-1. Bump the version in the plugin header, `readme.txt` (`Stable tag`) and the `VERSION` constant, and add a changelog line. Every release gets a new version.
-2. Build the zip (`git archive`, as the release workflow does), unzip it, and run Plugin Check against that folder as well as the repository, so you test what ships. The zip must hold no tests, lock files, `.github` or other development files.
-3. Tag `vX.Y.Z` and push. The release workflow checks the three versions match and attaches `shakewell-<name>.zip` to a GitHub release.
-
-## Install with Composer
-
-Until a plugin is listed, install the zip from its GitHub release, pinned to a version with a checksum:
-
-```json
-"repositories": [
-  {
-    "type": "package",
-    "package": {
-      "name": "shakewellagency/shakewell-<name>",
-      "version": "1.0.0",
-      "type": "wordpress-plugin",
-      "dist": {
-        "url": "https://github.com/shakewellagency/shakewell-<name>/releases/download/v1.0.0/shakewell-<name>.zip",
-        "type": "zip",
-        "shasum": "<sha1 of the zip>"
-      },
-      "require": { "php": ">=8.1", "composer/installers": "^2.3" }
-    }
-  }
-],
-"require": { "shakewellagency/shakewell-<name>": "1.0.0" }
-```
-
-Get the checksum with `shasum -a 1 shakewell-<name>.zip`.
-
-Use the zip, not a `vcs` repository. A source install puts tests and repository files under the web root, while the zip leaves them out. The build needs no GitHub token and makes no GitHub API calls. Copy the plugin's PHP requirement into `require`, because Composer doesn't read the plugin's own `composer.json` here.
-
-A plugin with runtime Composer libraries must ship `vendor/` in its zip. The template's release workflow uses `git archive`, which leaves `vendor/` out, so add `composer install --no-dev` and build the zip from `.distignore`, as `shakewell-saml-sso` does.
-
-Once a plugin is listed, switch to `wpackagist-plugin/shakewell-<name>` and drop this entry.
 
 ## Made by Shakewell
 
-Plugins built from this template join a family of free WordPress plugins from [Shakewell](https://shakewell.agency). Each one does one job, keeps its dependencies small and is released under GPL-2.0-or-later.
+Part of a family of free plugins from [Shakewell](https://shakewell.agency) for headless WordPress sites. Each one does one job, keeps its dependencies small and is released under GPL-2.0-or-later.
 
 Use it, fork it and send fixes. To have it set up on your site, or to have a plugin built, [talk to Shakewell](https://shakewell.agency).
 
 See them all: [Shakewell plugins on GitHub](https://github.com/orgs/shakewellagency/repositories?q=shakewell-).
-
-In a new plugin, change the first sentence of this section to say what the plugin is part of.

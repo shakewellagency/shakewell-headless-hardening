@@ -1,6 +1,6 @@
 {
-    "name": "shakewellagency/shakewell-plugin-template",
-    "description": "Starting point for Shakewell WordPress plugins.",
+    "name": "shakewellagency/shakewell-headless-hardening",
+    "description": "Opt-in hardening modules for headless WordPress sites: REST, ACF, XML-RPC and Gravity Forms API exposure.",
     "type": "wordpress-plugin",
     "license": "GPL-2.0-or-later",
     "authors": [
