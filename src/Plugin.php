@@ -28,6 +28,8 @@ final class Plugin {
 		'rest_boundaries'          => array( true, RestBoundaries::class ),
 		'xmlrpc_off'               => array( true, XmlRpcOff::class ),
 		'gravity_forms_api_v1_off' => array( false, GravityFormsApiV1Off::class ),
+		'gravity_forms_addresses'  => array( false, GravityFormsAddresses::class ),
+		'noindex_hosts'            => array( true, NoindexHosts::class ),
 	);
 
 	/**

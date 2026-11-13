@@ -12,6 +12,8 @@ Switchable hardening modules for WordPress sites that sit behind a separate fron
 | REST boundaries | `rest_boundaries` | on | Refuses `/wp/vN/users` and `/wp/vN/coauthors` to non-staff, and any namespace you list. Also answers 404 on author archives and drops the core users sitemap and removes `author_url` and `author_name` from oEmbed, because they confirm the same user slugs by another route. |
 | XML-RPC off | `xmlrpc_off` | on | Ends any XML-RPC request with a 403 before WordPress builds the server, and empties the method list as a second layer. |
 | Gravity Forms API v1 off | `gravity_forms_api_v1_off` | off | Turns off the legacy `/gravityformsapi/` API with the filter Gravity Forms provides, leaves REST API v2 running, and answers the old path with a plain 404. |
+| Gravity Forms addresses | `gravity_forms_addresses` | off | Removes the notification settings, and so the staff addresses they route to, from Gravity Forms REST v2 form definitions (`/gf/vN/forms` and `/gf/vN/forms/<id>`). Fields, choices and confirmations are untouched, and notifications are still sent on submission. |
+| No index on chosen hosts | `noindex_hosts` | on, but does nothing until you list hostnames | For requests on the hostnames you list, sends `X-Robots-Tag: noindex, nofollow` on pages and REST responses (not on files the web server serves without WordPress, which need a web-server rule), adds the robots meta tag, answers `robots.txt` with disallow-all and reports `blog_public` as 0. Every other hostname is untouched. |
 
 Every guard that refuses a request runs last in the filter chain and again just before the route callback, so a third-party callback that returns nothing cannot reopen a route. Guards fail closed: a secret nested too deep to inspect is emptied, not passed through.
 
@@ -41,6 +43,8 @@ Nothing site-specific is built in. Every list below is empty unless stated.
 | `shakewell_headless_hardening_redact_route_prefixes` | Routes whose responses are redacted for non-editors. Default `/wp/v2`, `/acf`. | ACF lockdown |
 | `shakewell_headless_hardening_acf_rest_post_types` | Post types that get an `acf` object holding only the fields below. | ACF lockdown |
 | `shakewell_headless_hardening_acf_rest_fields` | ACF field names that object exposes. A secret-shaped name is never exposed. | ACF lockdown |
+
+The no-index hostnames come from the constant or environment variable `SHAKEWELL_HEADLESS_HARDENING_NOINDEX_HOST_LIST` (comma-separated) and the filter `shakewell_headless_hardening_noindex_hosts`. An entry is an exact hostname, or `*.example.test` for every subdomain of `example.test`. The port is ignored.
 
 Example, in a small plugin or `functions.php`:
 
